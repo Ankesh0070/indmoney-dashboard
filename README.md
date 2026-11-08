@@ -10,6 +10,8 @@ npm start
 
 Open `http://localhost:8099`.
 
+The local grounded RAG server is `local-server.js`. It is deliberately not named `server.js`, because Vercel otherwise treats it as the production root function and ignores the static `dist/` dashboard.
+
 ## Deploy on Vercel
 
 Import this repository with the repository root selected. Vercel uses `npm run build` and publishes `dist/` automatically from `vercel.json`.
