@@ -1,0 +1,9 @@
+{
+  "name": "indmoney-dashboard",
+  "version": "1.0.0",
+  "private": false,
+  "description": "INDmoney Review Engine dashboard with grounded SIP-lifecycle RAG research",
+  "scripts": {
+    "start": "node server.js"
+  }
+}

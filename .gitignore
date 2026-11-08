@@ -1,0 +1,10 @@
+node_modules/
+.env
+.env.*
+*.log
+.DS_Store
+Thumbs.db
+data/
+primary_research_survey.csv
+primary_research_data.json
+interview_data.json
