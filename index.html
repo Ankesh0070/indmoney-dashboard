@@ -1076,7 +1076,7 @@ body::before {
   <div class="rag-header">
     <div>
       <h3>AI Discovery Assistant</h3>
-      <p>Grounded in 51,979 secondary reviews + the n=21 primary survey + 2 interview transcripts · Retrieval only, no investment advice</p>
+      <p>Grounded in 51,979 public secondary reviews · Research navigation only, no investment advice</p>
     </div>
     <button id="rag-close-btn" onclick="toggleRagPanel()">✕</button>
   </div>
@@ -1155,14 +1155,20 @@ fetch('analytics_data.json')
 fetch('primary_research_data.json')
   .then(res => res.json())
   .then(data => renderPrimaryResearch(data))
-  .catch(err => console.error('Error loading primary_research_data.json:', err));
+  .catch(err => {
+    console.error('Error loading primary_research_data.json:', err);
+    document.getElementById('pr-banner').textContent = 'Primary research is available in the private research workspace and is intentionally excluded from this public demo.';
+  });
 
 // Also independent: two recorded, transcribed interviews — qualitative
 // companion to the survey above, not derived from it.
 fetch('interview_data.json')
   .then(res => res.json())
   .then(data => renderInterviews(data))
-  .catch(err => console.error('Error loading interview_data.json:', err));
+  .catch(err => {
+    console.error('Error loading interview_data.json:', err);
+    document.getElementById('iv-banner').textContent = 'Interview transcripts are protected research material and are intentionally excluded from this public demo.';
+  });
 
 function initDashboard(data) {
   renderKPIs(data);
@@ -2083,7 +2089,7 @@ function toggleRagPanel() {
   panel.classList.toggle('open', ragOpen);
   if (ragOpen && document.getElementById('rag-messages').children.length === 0) {
     appendRagBotMessage({
-      answer: "Hi! Ask me anything about SIP investors — I draw on three distinct sources: the 51,979-review secondary dataset, our own n=21 primary survey, and 2 recorded interview transcripts, each clearly labeled in my answers (📱 Secondary Review / 📋 Primary Survey / 🎙️ Primary Interview). I only retrieve and summarize that real evidence; I won't recommend funds, stocks, or whether to invest.",
+      answer: "Hi! Ask me about patterns in the 51,979-review public dataset or how to navigate this dashboard. I summarize observed evidence and won't recommend funds, stocks, or whether to invest.",
       guarded: false, citations: [], stats: null, disclaimer: null
     });
   }
@@ -2298,12 +2304,14 @@ function buildStaticResearchAnswer(question) {
     answer = "Across the evidence, SIPs are commonly paused after mandate or payment failures, confusing app flows, poor support resolution, unexpected charges, and concern after underperformance. 📱 Secondary reviews repeatedly mention failed deductions and hard-to-find pause controls. 📋 The primary survey shows users often leave the app to seek reassurance. 🎙️ One anonymized interview participant described pausing and switching approach, while the other had never paused.";
   } else if (/kyc|verification|document|pan/.test(q)) {
     answer = "KYC friction in the review corpus centres on repeated verification, document-upload failures, unclear status, and weak recovery guidance. The useful product pattern is a visible step-by-step status, plain-language error explanation, and a direct route to the relevant help flow. This summarizes observed user friction; it is not financial advice.";
-  } else if (/interview|check|track|portfolio/.test(q)) {
-    answer = "🎙️ The two anonymized interview participants reported very different checking habits: one relied on automation and checked roughly every six months, while the other initially checked daily and later reduced this to once or twice a month. This illustrates why the app should support both low-attention and reassurance-seeking users.";
+  } else if (/interview/.test(q)) {
+    answer = "Interview transcripts are protected research material and are not exposed in the public dashboard. I can still summarize patterns from the 51,979-review public dataset, such as app friction, payment failures, support problems, and SIP-management confusion.";
+  } else if (/check|track|portfolio/.test(q)) {
+    answer = "Public review evidence shows that investors struggle when portfolio status, profit/loss, SIP history, or mandate state is hard to find or appears inconsistent. Clear status labels, predictable navigation, and direct help routes are recurring product needs in the dataset.";
   } else if (/survey|primary/.test(q)) {
-    answer = "📋 The primary survey contains 21 self-reported responses from first-time or early SIP investors. Use the Primary Research section for app choice, SIP tenure, demographics, checking frequency, information needs, influences, and what people do outside the app when unsure.";
+    answer = "The primary survey is retained in the private research workspace and is intentionally not exposed in this public dashboard. Ask me about patterns in the 51,979-review public dataset instead.";
   } else {
-    answer = "I can summarize the dashboard's research on SIP pause reasons, KYC and payment friction, investor checking behaviour, app usability, the n=21 primary survey, and two anonymized interviews. I provide research summaries and navigation help only—not investment recommendations.";
+    answer = "I can summarize the public 51,979-review dataset on SIP pause reasons, KYC and payment friction, investor checking behaviour, and app usability. I provide research summaries and navigation help only—not investment recommendations.";
   }
   return { answer, guarded: false, citations: [], disclaimer: "Grounded research summary — not investment advice." };
 }
