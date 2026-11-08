@@ -11,4 +11,8 @@ for (const file of ['index.html', 'analytics_data.json']) {
   fs.copyFileSync(path.join(root, file), path.join(out, file));
 }
 
+// Vercel serves index.html automatically at `/`. Keep a matching fallback so
+// direct navigation never lands on a generic platform 404 page.
+fs.copyFileSync(path.join(root, 'index.html'), path.join(out, '404.html'));
+
 console.log('Vercel static dashboard built in dist/');
