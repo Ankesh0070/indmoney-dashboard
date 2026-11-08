@@ -2165,8 +2165,7 @@ function appendRagBotMessage(result, question) {
   div.appendChild(el('div', 'rag-analysis-title', `📊 Synthesized Analysis: "${question}"`));
   div.appendChild(el('div', 'rag-analysis-sub',
     `Based on an analysis of ${result.sampleSize} highly relevant record${result.sampleSize === 1 ? '' : 's'} ` +
-    `(retrieved from ${result.totalMatched.toLocaleString()} matching records across the 51,979-review secondary corpus, ` +
-    `the n=21 primary survey, and the interview transcripts):`));
+    `(retrieved from ${result.totalMatched.toLocaleString()} matching records in the public 51,979-review corpus):`));
 
   // Key Insights & Sentiment Overview
   div.appendChild(el('div', 'rag-section-heading', '💡 Key Insights & Sentiment Overview'));
@@ -2209,8 +2208,8 @@ function appendRagBotMessage(result, question) {
     });
   }
 
-  // Summary & Recommendations
-  div.appendChild(el('div', 'rag-section-heading', '📌 Summary & Recommendations'));
+  // Summary & product implications (never investment recommendations)
+  div.appendChild(el('div', 'rag-section-heading', '📌 Summary & Product Implications'));
   div.appendChild(el('div', 'rag-closing-summary', result.closingSummary));
 
   // Meta footer: timing + citations button
@@ -2299,21 +2298,99 @@ function buildStaticResearchAnswer(question) {
     };
   }
 
-  let answer;
-  if (/pause|stop|cancel|discontinu/.test(q)) {
-    answer = "Across the public review evidence, SIPs are commonly paused after mandate or payment failures, confusing app flows, poor support resolution, unexpected charges, and concern after underperformance. Reviews repeatedly mention failed deductions, unclear status, and hard-to-find pause controls. This summarizes observed product friction and is not investment advice.";
-  } else if (/kyc|verification|document|pan/.test(q)) {
-    answer = "KYC friction in the review corpus centres on repeated verification, document-upload failures, unclear status, and weak recovery guidance. The useful product pattern is a visible step-by-step status, plain-language error explanation, and a direct route to the relevant help flow. This summarizes observed user friction; it is not financial advice.";
-  } else if (/interview/.test(q)) {
-    answer = "Interview transcripts are protected research material and are not exposed in the public dashboard. I can still summarize patterns from the 51,979-review public dataset, such as app friction, payment failures, support problems, and SIP-management confusion.";
-  } else if (/check|track|portfolio/.test(q)) {
-    answer = "Public review evidence shows that investors struggle when portfolio status, profit/loss, SIP history, or mandate state is hard to find or appears inconsistent. Clear status labels, predictable navigation, and direct help routes are recurring product needs in the dataset.";
-  } else if (/survey|primary/.test(q)) {
-    answer = "The primary survey is retained in the private research workspace and is intentionally not exposed in this public dashboard. Ask me about patterns in the 51,979-review public dataset instead.";
-  } else {
-    answer = "I can summarize the public 51,979-review dataset on SIP pause reasons, KYC and payment friction, investor checking behaviour, and app usability. I provide research summaries and navigation help only—not investment recommendations.";
+  if (/interview|survey|primary research/.test(q)) {
+    return {
+      answer: "That source is protected research material and is not exposed in this public dashboard. Ask about the public review corpus instead—for example SIP pauses, KYC, payments, support, refunds, portfolio tracking, or app usability.",
+      guarded: false, citations: [], disclaimer: "Public research assistant — no investment advice."
+    };
   }
-  return { answer, guarded: false, citations: [], disclaimer: "Grounded research summary — not investment advice." };
+  return buildClientRagResponse(question);
+}
+
+function buildClientRagResponse(question) {
+  const started = performance.now();
+  const reviews = (GLOBAL_DATA && GLOBAL_DATA.explorerReviews) || [];
+  const stop = new Set(['what','why','how','are','is','the','a','an','about','do','does','did','to','of','for','and','in','on','with','customers','users','people','reviews','saying','say']);
+  const synonyms = {
+    pause: ['pause','paused','stop','stopped','cancel','cancelled','discontinue','mandate'],
+    kyc: ['kyc','verification','verify','document','pan','aadhaar'],
+    payment: ['payment','paid','debit','deduct','transaction','upi','mandate','autopay'],
+    refund: ['refund','return','reversal','money back'],
+    support: ['support','customer care','help','ticket','response'],
+    portfolio: ['portfolio','profit','loss','tracking','track','balance'],
+    usability: ['ui','ux','confusing','interface','navigation','cluttered','slow']
+  };
+  const baseTerms = question.toLowerCase().match(/[a-z0-9]+/g)?.filter(t => t.length > 2 && !stop.has(t)) || [];
+  const expanded = new Set(baseTerms);
+  Object.entries(synonyms).forEach(([key, words]) => {
+    if (baseTerms.includes(key) || words.some(w => baseTerms.includes(w))) words.forEach(w => expanded.add(w));
+  });
+  if (!expanded.size) ['sip','app','support'].forEach(t => expanded.add(t));
+
+  const scored = reviews.map((review, originalIndex) => {
+    const haystack = `${review.app} ${review.text} ${review.sentiment}`.toLowerCase();
+    let score = 0;
+    expanded.forEach(term => {
+      const matches = haystack.split(term).length - 1;
+      if (matches) score += (term.includes(' ') ? 4 : 2) + Math.min(matches, 3);
+    });
+    if (/sip/i.test(question) && /sip/i.test(review.text)) score += 4;
+    if (/indmoney/i.test(question) && /indmoney/i.test(review.app)) score += 5;
+    return { review, score, originalIndex };
+  }).filter(item => item.score > 0).sort((a, b) => b.score - a.score || a.originalIndex - b.originalIndex);
+
+  const top = scored.slice(0, 8);
+  if (!top.length) {
+    return {
+      answer: "I couldn't find a strong evidence match in the public review sample. Try a more specific topic such as SIP pause, KYC, payment failure, refund delay, support, portfolio tracking, or app usability.",
+      guarded: false, citations: [], disclaimer: "No investment advice."
+    };
+  }
+
+  const citations = top.map((item, i) => ({
+    index: i + 1,
+    bm25: item.score.toFixed(3),
+    corpus: 'secondary',
+    reviewer: item.review.user || 'Anonymous Customer',
+    app_name: item.review.app,
+    rating: item.review.rating,
+    source: item.review.source || 'Verified review',
+    date: item.review.date,
+    full_text: item.review.text,
+    excerpt: item.review.text.length > 210 ? item.review.text.slice(0, 207) + '…' : item.review.text,
+    sentiment: item.review.sentiment
+  }));
+
+  const critical = top.filter(x => x.review.sentiment === 'negative').length;
+  const positive = top.filter(x => x.review.sentiment === 'positive').length;
+  const neutral = top.length - critical - positive;
+  const label = critical > positive ? 'Predominantly Critical / Friction-Oriented' : positive > critical ? 'Predominantly Positive' : 'Mixed Customer Sentiment';
+  const themeDefs = [
+    ['Payments, Mandates & SIP Execution', /payment|debit|deduct|transaction|upi|mandate|autopay|sip/i],
+    ['KYC & Account Verification', /kyc|verification|document|pan|aadhaar|login|account/i],
+    ['Customer Support & Resolution', /support|customer care|help|ticket|response|complaint/i],
+    ['Refunds, Charges & Cancellations', /refund|charge|fee|cancel|return|bounce/i],
+    ['App Experience & Portfolio Clarity', /ui|ux|app|slow|crash|portfolio|profit|loss|confus|track/i]
+  ];
+  const themes = themeDefs.map(([themeLabel, regex]) => {
+    const indexes = citations.filter(c => regex.test(c.full_text)).map(c => c.index);
+    return { label: themeLabel, mentions: indexes.length, citationIndexes: indexes.slice(0, 2) };
+  }).filter(theme => theme.mentions > 0).sort((a, b) => b.mentions - a.mentions);
+  const retrievalMs = Math.max(1, Math.round(performance.now() - started));
+
+  return {
+    answer: '', guarded: false, citations,
+    sampleSize: citations.length,
+    totalMatched: scored.length,
+    sentimentTrend: { label, critical, positive, neutral },
+    dominantFactorsNote: `Dominant factors: ${themes.slice(0, 3).map(t => t.label).join(', ') || 'general app experience'}.`,
+    evidenceMixNote: `${citations.length} verified public reviews retrieved from ${new Set(citations.map(c => c.app_name)).size} app${new Set(citations.map(c => c.app_name)).size === 1 ? '' : 's'}.`,
+    themes,
+    closingSummary: `The strongest matching reviews point to ${themes.slice(0, 2).map(t => t.label.toLowerCase()).join(' and ') || 'recurring product friction'}. Use “View ${citations.length} Citations” to inspect the exact evidence. This is a research summary, not investment advice.`,
+    retrievalMs,
+    totalMs: retrievalMs,
+    disclaimer: 'Grounded in public review evidence — not investment advice.'
+  };
 }
 </script>
 </body>
