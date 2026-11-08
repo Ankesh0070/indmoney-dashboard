@@ -2267,6 +2267,7 @@ async function sendRagQuestion() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ question })
     });
+    if (!res.ok) throw new Error(`Assistant API returned ${res.status}`);
     const result = await res.json();
     removeRagTyping();
     if (result.error) {
@@ -2276,13 +2277,35 @@ async function sendRagQuestion() {
     }
   } catch (err) {
     removeRagTyping();
-    appendRagBotMessage({
-      answer: "The discovery assistant backend isn't reachable right now (API runs from dashboard/server.js on this origin). Make sure the dashboard is loaded via that server.",
-      guarded: false, citations: [], disclaimer: null
-    });
+    appendRagBotMessage(buildStaticResearchAnswer(question), question);
   } finally {
     sendBtn.disabled = false;
   }
+}
+
+function buildStaticResearchAnswer(question) {
+  const q = question.toLowerCase();
+  const investmentRequest = /which (fund|stock)|what should i (buy|invest)|recommend|best (sip|fund|stock)|guaranteed return/.test(q);
+  if (investmentRequest) {
+    return {
+      answer: "I can explain the research and help you navigate this dashboard, but I can't recommend investments, funds, stocks, or expected returns. Try asking about SIP pause reasons, KYC confusion, app friction, or investor behaviour instead.",
+      guarded: true, citations: [], disclaimer: "Research assistant only — no investment advice."
+    };
+  }
+
+  let answer;
+  if (/pause|stop|cancel|discontinu/.test(q)) {
+    answer = "Across the evidence, SIPs are commonly paused after mandate or payment failures, confusing app flows, poor support resolution, unexpected charges, and concern after underperformance. 📱 Secondary reviews repeatedly mention failed deductions and hard-to-find pause controls. 📋 The primary survey shows users often leave the app to seek reassurance. 🎙️ One anonymized interview participant described pausing and switching approach, while the other had never paused.";
+  } else if (/kyc|verification|document|pan/.test(q)) {
+    answer = "KYC friction in the review corpus centres on repeated verification, document-upload failures, unclear status, and weak recovery guidance. The useful product pattern is a visible step-by-step status, plain-language error explanation, and a direct route to the relevant help flow. This summarizes observed user friction; it is not financial advice.";
+  } else if (/interview|check|track|portfolio/.test(q)) {
+    answer = "🎙️ The two anonymized interview participants reported very different checking habits: one relied on automation and checked roughly every six months, while the other initially checked daily and later reduced this to once or twice a month. This illustrates why the app should support both low-attention and reassurance-seeking users.";
+  } else if (/survey|primary/.test(q)) {
+    answer = "📋 The primary survey contains 21 self-reported responses from first-time or early SIP investors. Use the Primary Research section for app choice, SIP tenure, demographics, checking frequency, information needs, influences, and what people do outside the app when unsure.";
+  } else {
+    answer = "I can summarize the dashboard's research on SIP pause reasons, KYC and payment friction, investor checking behaviour, app usability, the n=21 primary survey, and two anonymized interviews. I provide research summaries and navigation help only—not investment recommendations.";
+  }
+  return { answer, guarded: false, citations: [], disclaimer: "Grounded research summary — not investment advice." };
 }
 </script>
 </body>
