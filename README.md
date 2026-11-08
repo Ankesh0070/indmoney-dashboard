@@ -5,7 +5,7 @@ Public academic research dashboard covering verified fintech reviews, first-time
 ## Run
 
 ```bash
-npm start
+node local-server.js
 ```
 
 Open `http://localhost:8099`.
