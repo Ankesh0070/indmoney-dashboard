@@ -4,6 +4,7 @@
   "private": false,
   "description": "INDmoney Review Engine dashboard with grounded SIP-lifecycle RAG research",
   "scripts": {
+    "build": "node build.js",
     "start": "node server.js"
   }
 }
